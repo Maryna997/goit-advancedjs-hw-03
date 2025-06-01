@@ -1,33 +1,65 @@
 import iziToast from "izitoast";
 import "izitoast/dist/css/iziToast.min.css";
+import SimpleLightbox from "simplelightbox";
+import "simplelightbox/dist/simple-lightbox.min.css";
 
-import { renderGallery, clearGallery } from "./js/render-functions";
+import { fetchImages } from "./js/pixabay-api";
+import { renderGalleryItem } from "./js/render-functions";
 
-const refs = {
-    form: document.querySelector('.form'),
-    gallery: document.querySelector('.gallery'),
-    input: document.querySelector('input'),
-};
+const form = document.querySelector('.form');
+const gallery = document.querySelector('.gallery');
+const input = document.querySelector('input');
+const loader = document.querySelector('.loader');
+
+const lightBoxInstance = new SimpleLightbox('.gallery a', {
+  captionsData: 'alt',
+  captionPosition: 'bottom',
+  captionDelay: 250,
+});
 
 const onFormSubmit = e => {
     e.preventDefault();
+    const form = e.currentTarget;
+    const query = input.value.trim();
+    input.value = '';
 
-    const query = refs.input.value;
-    refs.input.value = '';
+    if (query === '') {
+        iziToast.warning({
+          title: 'Caution',
+          message: 'Please enter a query!',
+          position: 'topRight',
+        });
+    
+        return;
+    }
+    
+    loader.classList.remove('hidden');
 
-    fetch(`https://pixabay.com/api/?q=${query}&key=50594223-08a3a2e6b4d3e84c5c31a5d02`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(response.status);
+    gallery.innerHTML = '';
+
+    fetchImages(query)
+        .then(data => {
+            loader.classList.add('hidden');
+            if (data.total === 0) {
+                gallery.innerHTML = '';
+
+                return iziToast.show({
+                    message:
+                        'Sorry, there are no images matching your search query. Please try again!',
+                    color: 'red',
+                    position: 'topRight',
+                });
             }
 
-            return response.json();
-        }).then(data => {
-            console.log(data);
-        } )
-        .catch(error => {
-            console.log(error);
+            gallery.innerHTML = renderGalleryItem(data.hits);
+            lightBoxInstance.refresh();
+        })
+        .catch(err => {
+            console.log(err);
+        })
+        .finally(() => {
+            form.reset();
         });
 }
 
-refs.form.addEventListener("submit", onFormSubmit);
+form.addEventListener("submit", onFormSubmit);
